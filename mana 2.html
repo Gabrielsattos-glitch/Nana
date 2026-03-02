@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Busca de Receitas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background: #FFFFFF;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Única coisa no topo: a barra de busca */
+        .search-box {
+            width: 100%;
+            margin: 10px 0 30px 0;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 16px 20px;
+            font-size: 16px;
+            border: 1.5px solid #E2E8F0;
+            border-radius: 12px;
+            transition: all 0.2s;
+            background: #FFFFFF;
+            padding-right: 50px;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #E63946;
+            box-shadow: 0 0 0 3px rgba(230, 57, 70, 0.1);
+        }
+
+        .search-box button {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 8px 12px;
+            color: #E63946;
+        }
+
+        .recipes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .recipe-card {
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .recipe-card:hover {
+            border-color: #E63946;
+            box-shadow: 0 4px 12px rgba(230, 57, 70, 0.1);
+        }
+
+        .recipe-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .recipe-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #E63946;
+        }
+
+        .expand-icon {
+            color: #E63946;
+            font-size: 20px;
+            transition: transform 0.2s;
+        }
+
+        .recipe-details {
+            display: none;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #E2E8F0;
+        }
+
+        .recipe-card.expanded .recipe-details {
+            display: block;
+        }
+
+        .recipe-details p {
+            margin: 12px 0 6px 0;
+            color: #4A5568;
+            font-weight: 600;
+        }
+
+        .recipe-details ul {
+            margin: 0 0 12px 0;
+            padding-left: 24px;
+            color: #4A5568;
+        }
+
+        .recipe-details li {
+            margin: 4px 0;
+            line-height: 1.5;
+        }
+
+        .recipe-details .preparation {
+            white-space: pre-line;
+            line-height: 1.6;
+            color: #4A5568;
+            margin-bottom: 12px;
+            font-weight: normal;
+        }
+
+        .observation {
+            background: #F7FAFC;
+            padding: 12px;
+            border-radius: 8px;
+            font-style: italic;
+            color: #4A5568;
+            margin-top: 12px;
+            font-size: 0.95em;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px 20px;
+            color: #A0AEC0;
+            font-size: 1.1em;
+            background: #F7FAFC;
+            border-radius: 16px;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 16px;
+            }
+            
+            .recipe-title {
+                font-size: 1.2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ÚNICA COISA: BARRA DE BUSCA -->
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Buscar receita por nome ou ingrediente...">
+            <button onclick="searchRecipes()">🔍</button>
+        </div>
+
+        <div class="recipes-list" id="recipesList">
+            <!-- Cards serão inseridos aqui -->
+        </div>
+    </div>
+
+    <script>
+        // Banco de dados completo com todas as receitas (dados originais das imagens)
+        const recipes = [
+            // BASES
+            {
+                name: "Alho batido",
+                ingredients: ["1 kg Alho descascado (in natura)", "900 ml Óleo de Soja"],
+                validity: "Validade conforme temperatura do freezer:\n• 0°C à -5°C: 10 dias\n• -6°C à -10°C: 20 dias\n• -11°C à -18°C: 30 dias\n• Menor -18°C: 90 dias",
+                prep: "1. Bater todos os ingredientes no liquidificador\n2. Congelar.",
+                epi: "Luvas de Vinil ou Nitrílica"
+            },
+            {
+                name: "Arroz integral",
+                ingredients: ["1 kg Arroz integral", "3 L de água"],
+                validity: "2 dias (sob refrigeração)",
+                yield: "2,5 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Lavar o arroz\n2. Colocar em água fria\n3. Cozinhar por 40 minutos em fogo alto",
+                epi: "Luvas de Vinil ou Nitrílica e Luva Térmica"
+            },
+            {
+                name: "Arroz gohan",
+                ingredients: ["2 L da conserva de vinagre de cereal", "5 kg arroz gohan (grão curto)", "6,5 L de água fria"],
+                validity: "2 dias",
+                yield: "16 kg",
+                storage: "Temperatura ambiente",
+                prep: "1. Lavar o arroz por 3 vezes\n2. Cozinhar por aproximadamente 30 minutos\n3. Deixar descansar por no mínimo 20 minutos\n4. Temperar o arroz ainda quente com a conserva do vinagre de cereal (sempre frio)\n5. Cobrir com pano descartável úmido (Perfex)\n6. Após esfriar, remover o pano e cobrir com tampa plástica",
+                epi: "Luvas de Vinil ou Nitrílica e Luva Térmica"
+            },
+            {
+                name: "Espaguete abobrinha",
+                ingredients: ["1 kg de abobrinha italiana"],
+                validity: "2 dias",
+                yield: "0,7 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Higienizar a abobrinha com produto específico\n2. Fatiar no ralador para espaguete\n3. Acondicionar e guardar sob refrigeração"
+            },
+            {
+                name: "Espaguete pupunha (in natura)",
+                ingredients: ["1 kg espaguete de pupunha", "3 litros de água"],
+                validity: "2 dias",
+                yield: "0,950 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Ferver a água\n2. Adicionar o espaguete\n3. Cozinhar por 10 minutos\n4. Escorrer a água e esfriar\n5. Guardar sob refrigeração"
+            },
+            {
+                name: "Espaguete pupunha em conserva",
+                ingredients: ["1 kg espaguete de pupunha", "3 litros de água"],
+                validity: "2 dias",
+                yield: "0,950 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Ferver a água\n2. Adicionar o espaguete\n3. Cozinhar por 10 minutos\n4. Escorrer a água e esfriar\n5. Guardar sob refrigeração"
+            },
+            {
+                name: "Grão de bico",
+                ingredients: ["1 kg de grão de bico", "3 L de água", "1/2 colher de sopa de sal"],
+                validity: "2 dias",
+                yield: "2,2 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Deixar de molho por 1 hora\n2. Escorrer a água\n3. Em panela de pressão, colocar 3L de água e o grão de bico\n4. Após pegar pressão, contar 30 minutos e desligar\n5. Escorrer a água, colocar em caixa plástica com tampa e refrigerar",
+                epi: "Luva Térmica"
+            },
+            {
+                name: "Quinoa",
+                ingredients: ["1 kg de quinoa vermelha em grãos", "2 L de água"],
+                validity: "2 dias",
+                yield: "2,7 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Colocar em panela com água e cozinhar por 20 minutos em fogo alto até secar\n2. Desligar\n3. Descansar por 30 minutos\n4. Armazenar em recipiente plástico com tampa sob refrigeração",
+                epi: "Luva Térmica"
+            },
+            {
+                name: "Mix de folhas higienizado",
+                ingredients: ["1 pacote de mix de folhas higienizadas (alface roxa, crespa e americana)"],
+                validity: "Verificar rótulo (após aberto)",
+                storage: "Sob refrigeração",
+                prep: "1. Abrir a embalagem\n2. Transferir para recipiente com tampa\n3. Manter sob refrigeração\nObs: Utilizar luva de vinil",
+                epi: "Luvas de Vinil ou Nitrílica"
+            },
+            {
+                name: "Mix de folhas não higienizado",
+                ingredients: ["200 g alface crespa", "200 g alface americana", "100 g alface roxa"],
+                validity: "1 dia",
+                storage: "Sob refrigeração",
+                prep: "1. Higienizar conforme POP\n2. Cortar em quadrados de 2,5 cm\n3. Transferir para recipiente com tampa\n4. Manter sob refrigeração",
+                epi: "Luvas de Vinil ou Nitrílica"
+            },
+            {
+                name: "Repolho roxo",
+                ingredients: ["1 cabeça de repolho roxo"],
+                validity: "2 dias",
+                storage: "Sob refrigeração",
+                prep: "1. Lavar em água corrente (cabeça inteira)\n2. Cortar em 4 partes e remover o miolo\n3. Higienizar com sanitizante (cortado em 4 partes)\n4. No processador, disco E1\n5. Embalar e identificar\nObs: Em menor demanda, fatiar manualmente",
+                epi: "Luvas de Vinil ou Nitrílica e Luva de Malha de Aço"
+            },
+
+            // PROTEÍNAS
+            {
+                name: "Atum",
+                ingredients: ["1 kg de atum"],
+                validity: "1 dia",
+                yield: "0,9 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Descongelar sob refrigeração\n2. Limpar e retirar o nervo\n3. Cortar em fatias e cubos de 1,5cm\n4. Armazenar em caixa plástica com tampa",
+                epi: "Luvas de Vinil ou Nitrílica e Luva de Malha de Aço"
+            },
+            {
+                name: "Atum com cream cheese",
+                ingredients: ["60 g atum cortado", "20 g cream cheese"],
+                validity: "1 dia",
+                storage: "Sob refrigeração",
+                prep: "1. Misturar todos os ingredientes\nObs: Misturar de acordo com a demanda"
+            },
+            {
+                name: "Camarão Grelhado",
+                ingredients: ["1 kg camarão 61/70 limpo", "8 g sal rosa", "1 pitada pimenta-do-reino", "70 ml suco de limão", "40 ml azeite"],
+                validity: "1 dia",
+                yield: "830 g",
+                storage: "Sob refrigeração",
+                prep: "1. Pré-cozinhar em água fervente 30 segundos\n2. Passar em água gelada\n3. Temperar e marinar 5 minutos\n4. Grelhar 30 segundos de cada lado\n5. Choque térmico no congelador 10-15 min\n6. Armazenar sob refrigeração",
+                epi: "Luvas de Vinil ou Nitrílica e Luvas Térmicas",
+                obs: "Produção com utensílios exclusivos"
+            },
+            {
+                name: "Ceviche",
+                ingredients: ["1 kg filé de tilápia", "50 g sal rosa", "300 ml limão espremido"],
+                validity: "1 dia",
+                yield: "1,360 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Limpar e retirar pele mais escura\n2. Cortar em cubos\n3. Temperar com limão e sal\n4. Marinar 20 minutos sob refrigeração\nObs: Manter imerso no tempero",
+                epi: "Luvas de Vinil ou Nitrílica e Luva de Malha de Aço"
+            },
+            {
+                name: "Frango desfiado",
+                ingredients: ["5 kg peito de frango", "40 g colorau", "70 g alho batido", "8 g sal", "2,5 L água", "50 ml pimenta sriracha"],
+                validity: "2 dias",
+                yield: "3,5 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Cozinhar na pressão com água e temperos\n2. Após pegar pressão, 30 minutos\n3. Escorrer água\n4. Desfiar grosseiramente ainda quente\n5. Armazenar em caixa plástica",
+                epi: "Luvas de Vinil ou Nitrílica e Luvas Térmicas"
+            },
+            {
+                name: "Frango lemon pepper",
+                ingredients: ["1 kg peito de frango", "20 g lemon pepper", "40 ml óleo composto", "20 ml suco de abacaxi"],
+                validity: "2 dias",
+                yield: "660 g",
+                storage: "Sob refrigeração",
+                prep: "1. Cortar em cubos 2cm\n2. Temperar e marinar 5 minutos\n3. Aquecer frigideira\n4. Grelhar até dourar\n5. Transferir para caixa plástica",
+                epi: "Luvas de Malha de Aço, Vinil e Térmicas"
+            },
+            {
+                name: "Salmão",
+                ingredients: ["1 kg salmão limpo"],
+                validity: "1 dia",
+                storage: "Sob refrigeração",
+                prep: "1. Limpar e remover aparas\n2. Cortar em cubos 1,5cm\n3. Armazenar em caixa plástica",
+                epi: "Luva de Malha de Aço e Luvas de Vinil"
+            },
+            {
+                name: "Salmão com cream cheese",
+                ingredients: ["60 g salmão cortado", "20 g cream cheese"],
+                validity: "1 dia",
+                storage: "Sob refrigeração",
+                prep: "1. Misturar todos os ingredientes\nObs: Misturar conforme demanda"
+            },
+            {
+                name: "Salmão grelhado",
+                ingredients: ["1 kg salmão limpo", "10 g sal", "100 g margarina"],
+                validity: "1 dia",
+                yield: "900 g",
+                storage: "Sob refrigeração",
+                prep: "1. Limpar e cortar em cubos 2,5cm\n2. Derreter margarina\n3. Dourar dos dois lados\n4. Escorrer gordura e esfriar\n5. Armazenar",
+                epi: "Luva de Malha de Aço, Vinil e Térmicas"
+            },
+            {
+                name: "Shimeji",
+                ingredients: ["1 kg shimeji branco", "100 ml shoyu", "100 ml óleo composto"],
+                validity: "2 dias",
+                yield: "830 g",
+                storage: "Sob refrigeração",
+                prep: "1. Desfiar o cogumelo\n2. Aquecer óleo e adicionar shimeji\n3. Cozinhar até al dente (20 min)\n4. Adicionar shoyu e tampar\n5. Esfriar e refrigerar",
+                epi: "Luvas de Vinil e Térmicas"
+            },
+            {
+                name: "Ovos de codorna",
+                ingredients: ["Ovos de codorna"],
+                validity: "Verificar rótulo",
+                storage: "Sob refrigeração",
+                prep: "1. Abrir embalagem\n2. Lavar em água corrente\n3. Manter imerso em água filtrada (trocar diariamente)\n4. Porcionamento: Marola 80g, Viagem 100g, Tsunami 120g"
+            },
+            {
+                name: "Tofu Temperado",
+                ingredients: ["1 kg tofu extra firme", "20 g sal rosa", "60 ml limão", "60 ml óleo de gergelim"],
+                validity: "1 dia",
+                yield: "1 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Cortar em cubos 1,5cm\n2. Marinar com sal, limão e óleo\n3. Descansar 5 minutos\n4. Transferir e refrigerar"
+            },
+
+            // CRUNCHES
+            {
+                name: "Cebola crispy",
+                ingredients: ["1 kg cebola", "400 g farinha de trigo", "4 kg gordura de palma"],
+                validity: "2 dias",
+                yield: "600 g",
+                storage: "Temperatura ambiente",
+                prep: "1. Fatiar (lâmina E3mm)\n2. Enfarinhar no momento da fritura\n3. Fritar a 160-180°C\n4. Escorrer em papel toalha",
+                epi: "Mangote Térmico"
+            },
+            {
+                name: "Chips de banana da terra",
+                ingredients: ["1 kg banana da terra verde", "4 kg gordura de palma"],
+                validity: "2 dias",
+                yield: "360 g",
+                storage: "Temperatura ambiente",
+                prep: "1. Lavar (não descascar)\n2. Cortar em rodelas finas (E1mm)\n3. Fritar a 160-180°C\n4. Escorrer",
+                epi: "Mangote Térmico"
+            },
+            {
+                name: "Chips de batata doce",
+                ingredients: ["1 kg batata doce", "4 kg gordura de palma"],
+                validity: "2 dias",
+                yield: "420 g",
+                storage: "Temperatura ambiente",
+                prep: "1. Higienizar\n2. Fatiar (E1mm)\n3. Fritar a 160-180°C",
+                epi: "Mangote Térmico"
+            },
+            {
+                name: "Chips de mandioca",
+                ingredients: ["1 kg mandioca descascada", "4 kg gordura de palma"],
+                validity: "2 dias",
+                yield: "420 g",
+                storage: "Temperatura ambiente",
+                prep: "1. Fatiar (E1mm)\n2. Fritar a 160-180°C\n3. Escorrer",
+                epi: "Mangote Térmico",
+                obs: "Preferencialmente em tacho de fritura"
+            },
+            {
+                name: "Couve crispy",
+                ingredients: ["1 kg couve manteiga fatiada", "4 kg gordura de palma"],
+                validity: "2 dias",
+                storage: "Temperatura ambiente",
+                prep: "1. Aquecer gordura (máx 180°C)\n2. Fritar até dourar\n3. Escorrer",
+                epi: "Mangote Térmico"
+            },
+            {
+                name: "Palha de nori",
+                ingredients: ["1 folha de nori"],
+                validity: "2 dias",
+                storage: "Temperatura ambiente",
+                prep: "1. Dobrar em 3 partes\n2. Cortar no comprimento\n3. Cortar em tiras com tesoura"
+            },
+
+            // MOLHOS
+            {
+                name: "Molho clássico",
+                ingredients: ["1 L shoyu tradicional", "50 ml óleo de gergelim"],
+                validity: "3 dias",
+                yield: "1050 ml",
+                storage: "Temperatura ambiente",
+                prep: "Misturar todos os ingredientes"
+            },
+            {
+                name: "Molho fresh lime",
+                ingredients: ["1 L limão espremido", "400 ml azeite", "30 g sal rosa", "50 g alho em pó"],
+                validity: "1 dia",
+                yield: "1400 ml",
+                storage: "Sob refrigeração",
+                prep: "Bater no liquidificador velocidade 2 por 1 minuto"
+            },
+            {
+                name: "Molho mana",
+                ingredients: ["300 ml suco maracujá Maguary", "200 ml suco limão", "620 g abacaxi picado", "400 ml mel"],
+                validity: "2 dias",
+                yield: "1400 ml",
+                storage: "Sob refrigeração",
+                prep: "1. Bater no liquidificador\n2. Coar\n3. Refrigerar"
+            },
+            {
+                name: "Molho mostarda e mel",
+                ingredients: ["1 L mostarda amarela", "500 ml água", "250 ml mel"],
+                validity: "2 dias",
+                yield: "1750 ml",
+                storage: "Sob refrigeração",
+                prep: "Bater no liquidificador"
+            },
+            {
+                name: "Molho ponzu",
+                ingredients: ["1 L shoyu", "50 ml óleo gergelim", "50 ml limão"],
+                validity: "3 dias",
+                yield: "1100 ml",
+                storage: "Temperatura ambiente",
+                prep: "Misturar todos os ingredientes"
+            },
+            {
+                name: "Molho spice",
+                ingredients: ["1 L shoyu", "50 ml óleo gergelim", "50 ml limão", "20 ml pimenta sriracha"],
+                validity: "3 dias",
+                yield: "1020 ml",
+                storage: "Temperatura ambiente",
+                prep: "Misturar todos os ingredientes"
+            },
+            {
+                name: "Molho tarê",
+                ingredients: ["1 L shoyu", "1 kg açúcar", "1 cebola pequena"],
+                validity: "3 dias",
+                yield: "1 L",
+                storage: "Temperatura ambiente",
+                prep: "1. Cortar cebola em cubos\n2. Cozinhar tudo até ponto de calda\n3. Esfriar, coar e acondicionar",
+                epi: "Luvas Térmicas"
+            },
+
+            // ACOMPANHAMENTOS
+            {
+                name: "Abacate",
+                ingredients: ["1 kg abacate limpo", "1 L água", "10 ml limão"],
+                validity: "1 dia",
+                prep: "1. Descascar e cortar em cubos 2x2cm\n2. Misturar água e limão\n3. Acrescentar abacate\n4. Refrigerar",
+                epi: "Luva de Malha de Aço e Luvas de Vinil",
+                obs: "Preferencialmente consumo no dia"
+            },
+            {
+                name: "Abacaxi",
+                ingredients: ["1 unidade abacaxi"],
+                validity: "2 dias",
+                yield: "690 g",
+                storage: "Sob refrigeração",
+                prep: "1. Higienizar\n2. Cortar bases e descascar\n3. Remover talo\n4. Cortar em cubos 1,5cm",
+                epi: "Luva de Malha de Aço e Luvas de Vinil",
+                obs: "Preferencialmente consumo no dia"
+            },
+            {
+                name: "Cenoura",
+                ingredients: ["1 kg cenoura"],
+                validity: "2 dias",
+                yield: "870 g",
+                storage: "Sob refrigeração",
+                prep: "1. Descascar\n2. Ralar processador lâmina Z3",
+                epi: "Luvas de Vinil",
+                obs: "Preferencialmente consumo no dia"
+            },
+            {
+                name: "Conserva de vinagre",
+                ingredients: ["1 L vinagre de cereal", "800 g açúcar", "5 g sal"],
+                validity: "3 dias",
+                yield: "1100 ml",
+                storage: "Temperatura ambiente",
+                prep: "1. Misturar\n2. Ferver em fogo baixo 30 min",
+                epi: "Luvas Térmicas"
+            },
+            {
+                name: "Edamame",
+                ingredients: ["1 kg edamame", "2 L água"],
+                validity: "2 dias",
+                yield: "1 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Ferver água\n2. Cozinhar 5 minutos\n3. Escorrer e esfriar",
+                epi: "Luvas Térmicas"
+            },
+            {
+                name: "Kani",
+                ingredients: ["1 pacote kani"],
+                validity: "Vide embalagem",
+                yield: "6 pedaços por unidade",
+                prep: "1. Descongelar\n2. Cortar em cubos 1,5cm",
+                epi: "Luvas de Vinil"
+            },
+            {
+                name: "Kiwi",
+                ingredients: ["1 unidade kiwi"],
+                validity: "2 dias",
+                yield: "10-15 fatias",
+                storage: "Sob refrigeração",
+                prep: "1. Higienizar e descascar\n2. Cortar fatias 0,5cm",
+                epi: "Luvas de Vinil",
+                obs: "Espessura varia conforme maturação"
+            },
+            {
+                name: "Manga",
+                ingredients: ["1 unidade manga"],
+                validity: "2 dias",
+                yield: "390 g",
+                storage: "Sob refrigeração",
+                prep: "1. Higienizar\n2. Descascar\n3. Cortar ao redor do caroço\n4. Fatiar 1,5cm",
+                epi: "Luvas de Vinil e Luva de Malha de Aço",
+                obs: "Preferencialmente consumo no dia"
+            },
+            {
+                name: "Pepino",
+                ingredients: ["1 kg pepino japonês"],
+                validity: "2 dias",
+                yield: "1 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Higienizar\n2. Fatiar com casca (lâmina E1mm)",
+                epi: "Luvas de Vinil",
+                obs: "Preferencialmente consumo no dia"
+            },
+            {
+                name: "Sunomono",
+                ingredients: ["1 kg pepino japonês", "1200 ml conserva de vinagre"],
+                validity: "2 dias",
+                yield: "1 kg",
+                storage: "Sob refrigeração",
+                prep: "1. Higienizar e fatiar pepino\n2. Misturar conserva\n3. Descansar 3h sob refrigeração",
+                epi: "Luvas de Vinil"
+            },
+            {
+                name: "Tomate cereja",
+                ingredients: ["1 kg tomate cereja"],
+                validity: "2 dias",
+                storage: "Sob refrigeração",
+                prep: "1. Higienizar\n2. Cortar ao meio (pequenos) ou em 4 (médios/grandes)",
+                epi: "Luvas de Vinil",
+                obs: "Preferencialmente consumo no dia"
+            },
+            {
+                name: "Wakame",
+                ingredients: ["Wakame"],
+                validity: "Verificar rótulo",
+                storage: "Sob refrigeração",
+                prep: "1. Descongelar apenas necessário\n2. Armazenar na cuba",
+                epi: "Luvas de Vinil"
+            },
+            {
+                name: "Azeite trufado",
+                ingredients: ["Azeite trufado"],
+                validity: "Verificar rótulo",
+                prep: "1. Transferir para borrifador\n2. Aplicar 2-3 borrifadas no poke Tsunami"
+            },
+            {
+                name: "Cebola roxa",
+                ingredients: ["Cebola roxa"],
+                validity: "2 dias",
+                storage: "Sob refrigeração",
+                prep: "1. Lavar com casca\n2. Descascar e lavar novamente\n3. Cortar ao meio, remover miolo\n4. Fatiar",
+                epi: "Luvas de Vinil"
+            },
+            {
+                name: "Cebolinha higienizada",
+                ingredients: ["Cebolinha"],
+                validity: "Verificar rótulo",
+                storage: "Sob refrigeração",
+                prep: "1. Abrir embalagem\n2. Transferir para recipiente com tampa"
+            },
+            {
+                name: "Cebolinha não higienizada",
+                ingredients: ["Cebolinha"],
+                validity: "2 dias",
+                storage: "Sob refrigeração",
+                prep: "1. Higienizar conforme POP\n2. Escorrer\n3. Cortar 1,5-2,5mm\n4. Recipiente com tampa",
+                epi: "Luvas de Vinil"
+            },
+            {
+                name: "Gergelim",
+                ingredients: ["500 g gergelim"],
+                validity: "2 dias",
+                prep: "1. Aquecer frigideira\n2. Torrar mexendo até dourar\n3. Esfriar em recipiente",
+                epi: "Luvas Térmicas"
+            },
+            {
+                name: "Gengibre",
+                ingredients: ["Gengibre"],
+                validity: "Verificar rótulo",
+                prep: "1. Transferir para recipiente com tampa\n2. Refrigerar"
+            },
+            {
+                name: "Pimenta biquinho",
+                ingredients: ["Pimenta biquinho"],
+                validity: "Verificar rótulo",
+                prep: "1. Transferir para recipiente com tampa\n2. Refrigerar"
+            },
+            {
+                name: "Wasabi",
+                ingredients: ["Wasabi em pó"],
+                validity: "2 dias",
+                storage: "Sob refrigeração",
+                prep: "1. Preparar conforme fabricante\n2. Porcionar em bolinhas de 10g"
+            },
+
+            // SOBREMESAS
+            {
+                name: "Abacaxi com raspas de limão",
+                ingredients: ["1 abacaxi", "1 limão"],
+                validity: "1 dia",
+                storage: "Sob refrigeração",
+                prep: "Abacaxi: cortar em cubos 1,5cm\nLimão: raspar casca\nMontagem: 100g abacaxi + raspas",
+                epi: "Luva de Malha de Aço e Luvas de Vinil"
+            },
+
+            // BEBIDAS
+            {
+                name: "Suco natural de abacaxi",
+                ingredients: ["200 g abacaxi maduro", "250 ml água"],
+                validity: "1 dia",
+                yield: "300 ml",
+                prep: "1. Bater no liquidificador\n2. Coar\n3. Envasar",
+                epi: "Luva de Malha de Aço e Luvas de Vinil"
+            },
+            {
+                name: "Suco detox",
+                ingredients: ["200 ml suco abacaxi", "80 ml suco limão", "15 g couve", "5 g gengibre"],
+                validity: "1 dia",
+                yield: "300 ml",
+                prep: "1. Bater no liquidificador\n2. Coar\n3. Envasar"
+            },
+            {
+                name: "Suco natural de limão",
+                ingredients: ["80 ml limão espremido", "220 ml água"],
+                validity: "1 dia",
+                yield: "300 ml",
+                prep: "1. Espremer limões\n2. Misturar com água\n3. Envasar"
+            }
+        ];
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            displayRecipes(recipes);
+            
+            document.getElementById('searchInput').addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') {
+                    searchRecipes();
+                }
+            });
+            
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                filterRecipes(searchTerm);
+            });
+        });
+
+        function searchRecipes() {
+            const input = document.getElementById('searchInput');
+            filterRecipes(input.value.toLowerCase());
+        }
+
+        function filterRecipes(searchTerm) {
+            if (!searchTerm) {
+                displayRecipes(recipes);
+                return;
+            }
+            
+            const filtered = recipes.filter(recipe => 
+                recipe.name.toLowerCase().includes(searchTerm) ||
+                recipe.ingredients.some(i => i.toLowerCase().includes(searchTerm))
+            );
+            
+            displayRecipes(filtered);
+        }
+
+        function displayRecipes(recipesToShow) {
+            const list = document.getElementById('recipesList');
+            
+            if (recipesToShow.length === 0) {
+                list.innerHTML = '<div class="no-results">🔍 Nenhuma receita encontrada</div>';
+                return;
+            }
+            
+            list.innerHTML = recipesToShow.map(recipe => {
+                // Monta os detalhes da receita
+                let details = '';
+                
+                // Ingredientes
+                details += '<p>📝 Ingredientes:</p><ul>';
+                recipe.ingredients.forEach(ing => {
+                    details += `<li>${ing}</li>`;
+                });
+                details += '</ul>';
+                
+                // Validade
+                if (recipe.validity) {
+                    details += `<p>⏰ Validade:</p><div class="preparation">${recipe.validity.replace(/\n/g, '<br>')}</div>`;
+                }
+                
+                // Rendimento
+                if (recipe.yield) {
+                    details += `<p>⚖️ Rendimento:</p><div class="preparation">${recipe.yield}</div>`;
+                }
+                
+                // Armazenamento
+                if (recipe.storage) {
+                    details += `<p>🌡️ Armazenamento:</p><div class="preparation">${recipe.storage}</div>`;
+                }
+                
+                // Modo de preparo
+                details += `<p>👩‍🍳 Modo de preparo:</p><div class="preparation">${recipe.prep.replace(/\n/g, '<br>')}</div>`;
+                
+                // EPIs
+                if (recipe.epi) {
+                    details += `<p>🧤 EPIs recomendados:</p><div class="preparation">${recipe.epi}</div>`;
+                }
+                
+                // Observações
+                if (recipe.obs) {
+                    details += `<div class="observation">📌 ${recipe.obs}</div>`;
+                }
+                
+                return `
+                    <div class="recipe-card" onclick="toggleCard(this)">
+                        <div class="recipe-header">
+                            <span class="recipe-title">${recipe.name}</span>
+                            <span class="expand-icon">▼</span>
+                        </div>
+                        <div class="recipe-details">
+                            ${details}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleCard(card) {
+            card.classList.toggle('expanded');
+            const icon = card.querySelector('.expand-icon');
+            icon.textContent = card.classList.contains('expanded') ? '▲' : '▼';
+        }
+    </script>
+</body>
+</html>
